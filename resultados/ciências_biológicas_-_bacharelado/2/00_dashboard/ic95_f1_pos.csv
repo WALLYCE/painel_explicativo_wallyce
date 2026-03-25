@@ -1,0 +1,5 @@
+curso,periodo,modelo,n,f1_pos_media,f1_pos_ci95_low,f1_pos_ci95_high
+Ciências Biológicas - Bacharelado,2,XGBoost,30,0.41415275602178636,0.361886064452323,0.4664194475912497
+Ciências Biológicas - Bacharelado,2,LightGBM,30,0.4287433081846441,0.39414256571146944,0.4633440506578188
+Ciências Biológicas - Bacharelado,2,CatBoost,30,0.42550167142469186,0.3676405401783893,0.4833628026709944
+Ciências Biológicas - Bacharelado,2,Comite_Arvores_XGB_LGBM_CatBoost,30,0.433931850532895,0.3853239833780146,0.4825397176877754

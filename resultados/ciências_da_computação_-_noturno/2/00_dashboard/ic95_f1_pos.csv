@@ -1,0 +1,5 @@
+curso,periodo,modelo,n,f1_pos_media,f1_pos_ci95_low,f1_pos_ci95_high
+Ciências da Computação - Noturno,2,XGBoost,30,0.8235801541713645,0.8062173746931399,0.8409429336495892
+Ciências da Computação - Noturno,2,LightGBM,30,0.8247839136348335,0.809856954972728,0.839710872296939
+Ciências da Computação - Noturno,2,CatBoost,30,0.8172654216923616,0.7994505573030981,0.8350802860816251
+Ciências da Computação - Noturno,2,Comite_Arvores_XGB_LGBM_CatBoost,30,0.8140186938255682,0.7938329566358057,0.8342044310153308

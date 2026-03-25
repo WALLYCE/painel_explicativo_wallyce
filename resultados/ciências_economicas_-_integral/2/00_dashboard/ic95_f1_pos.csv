@@ -1,0 +1,5 @@
+curso,periodo,modelo,n,f1_pos_media,f1_pos_ci95_low,f1_pos_ci95_high
+Ciências Economicas - Integral,2,XGBoost,30,0.6144156732756865,0.5906392070594059,0.6381921394919671
+Ciências Economicas - Integral,2,LightGBM,30,0.6288880095003989,0.605667985692661,0.6521080333081368
+Ciências Economicas - Integral,2,CatBoost,30,0.6409033265309524,0.6179795092051114,0.6638271438567934
+Ciências Economicas - Integral,2,Comite_Arvores_XGB_LGBM_CatBoost,30,0.6444251705811535,0.6199886081074961,0.6688617330548108

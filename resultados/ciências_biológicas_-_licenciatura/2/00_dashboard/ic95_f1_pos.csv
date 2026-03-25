@@ -1,0 +1,5 @@
+curso,periodo,modelo,n,f1_pos_media,f1_pos_ci95_low,f1_pos_ci95_high
+Ciências Biológicas - Licenciatura,2,XGBoost,30,0.20895331988733332,0.16193319539653758,0.255973444378129
+Ciências Biológicas - Licenciatura,2,LightGBM,30,0.22352918370123903,0.17835145737197383,0.26870691003050423
+Ciências Biológicas - Licenciatura,2,CatBoost,30,0.24710506703233248,0.19804133123690418,0.29616880282776076
+Ciências Biológicas - Licenciatura,2,Comite_Arvores_XGB_LGBM_CatBoost,30,0.22664127421027916,0.17777304144953307,0.2755095069710253

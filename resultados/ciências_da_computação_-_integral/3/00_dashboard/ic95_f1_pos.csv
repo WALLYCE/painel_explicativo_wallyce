@@ -1,0 +1,5 @@
+curso,periodo,modelo,n,f1_pos_media,f1_pos_ci95_low,f1_pos_ci95_high
+Ciências da Computação - Integral,3,XGBoost,30,0.6408751204056531,0.5772877836799404,0.7044624571313658
+Ciências da Computação - Integral,3,LightGBM,30,0.6637335942627924,0.5995134984246543,0.7279536901009306
+Ciências da Computação - Integral,3,CatBoost,30,0.635510863375975,0.5764471552550983,0.6945745714968516
+Ciências da Computação - Integral,3,Comite_Arvores_XGB_LGBM_CatBoost,30,0.6147142503505961,0.5414974665525197,0.6879310341486725

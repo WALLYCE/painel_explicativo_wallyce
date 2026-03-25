@@ -1,0 +1,5 @@
+curso,periodo,modelo,n,f1_pos_media,f1_pos_ci95_low,f1_pos_ci95_high
+Ciências Economicas - Noturno,2,XGBoost,30,0.6633043012284626,0.6448310997329401,0.6817775027239852
+Ciências Economicas - Noturno,2,LightGBM,30,0.677659674911964,0.659892322393712,0.695427027430216
+Ciências Economicas - Noturno,2,CatBoost,30,0.6706920355944029,0.6509056027375698,0.6904784684512361
+Ciências Economicas - Noturno,2,Comite_Arvores_XGB_LGBM_CatBoost,30,0.6756654608269561,0.6590754378689306,0.6922554837849816
