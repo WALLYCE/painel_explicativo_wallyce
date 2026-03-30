@@ -642,7 +642,7 @@ with abas[0]:
         c2.metric("ROC-AUC", "-")
         c3.metric("Brier", "-")
 
-    c4.metric("Nº estudantes", f"{total_instancias}" if total_instancias is not None else "-")
+    c4.metric("Estudantes analisados", f"{total_instancias}" if total_instancias is not None else "-")
 
     st.markdown("#### Variáveis mais importantes")
     plot_df = top_df.sort_values("importancia")
