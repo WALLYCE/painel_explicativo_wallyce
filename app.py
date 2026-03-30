@@ -19,7 +19,6 @@ except Exception:
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.calibration import CalibratedClassifierCV
 
-
 # ============================================================
 # Configuração da página
 # ============================================================
@@ -29,10 +28,49 @@ st.set_page_config(
     page_icon="📊",
 )
 
+st.markdown(
+    """
+<style>
+.block-container {
+    padding-top: 1.2rem;
+    padding-bottom: 1rem;
+    max-width: 1200px;
+}
+
+h1, h2, h3 {
+    margin-bottom: 0.3rem !important;
+}
+
+p, .stCaption {
+    margin-bottom: 0.35rem !important;
+}
+
+div[data-testid="stMetric"] {
+    border: 1px solid #E6E6E6;
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: #FAFAFA;
+}
+
+div[data-testid="stExpander"] {
+    border: 1px solid #EAEAEA;
+    border-radius: 10px;
+}
+
+[data-testid="stDataFrame"] {
+    border-radius: 10px;
+    overflow: hidden;
+}
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
 # Por padrão, procura os artefatos em ./resultados ao lado deste arquivo.
 # Se quiser sobrescrever sem editar o código, defina a variável de ambiente:
 # STREAMLIT_WEB_DIR=E:\\mestrado\\web\\resultados
 COMMITTEE_NAME = "Comite_Arvores_XGB_LGBM_CatBoost"
+
 
 def get_secret(name: str, default=None):
     try:
@@ -42,9 +80,12 @@ def get_secret(name: str, default=None):
         pass
     return os.getenv(name, default)
 
+
 BASE_DIR = Path(get_secret("STREAMLIT_WEB_DIR", Path(__file__).parent / "resultados")).resolve()
 OPENAI_API_KEY = get_secret("OPENAI_API_KEY", "")
 OPENAI_MODEL = get_secret("OPENAI_MODEL", "gpt-5-mini")
+
+
 # ============================================================
 # Classe do comitê para deserialização do pickle
 # ============================================================
@@ -470,13 +511,13 @@ def gerar_explicacao_openai(prompt: str) -> str:
             input=[
                 {
                     "role": "system",
-                    "content": "Você é um assistente que explica resultados acadêmicos com clareza, precisão e linguagem acessível."
+                    "content": "Você é um assistente que explica resultados acadêmicos com clareza, precisão e linguagem acessível.",
                 },
                 {
                     "role": "user",
-                    "content": prompt
-                }
-            ]
+                    "content": prompt,
+                },
+            ],
         )
 
         texto = getattr(response, "output_text", None)
@@ -494,11 +535,8 @@ def gerar_explicacao_openai(prompt: str) -> str:
 # ============================================================
 # Interface
 # ============================================================
-st.markdown("<h1 style='text-align:center;'>📊 Painel de Avaliação e Explicabilidade do Comitê</h1>", unsafe_allow_html=True)
-st.markdown(
-    "<p style='text-align:center;'>Resultados globais com foco em SHAP, confiabilidade do comitê e simulação de novos perfis.</p>",
-    unsafe_allow_html=True,
-)
+st.title("📊 Painel de Avaliação e Explicabilidade")
+st.caption("Análise do comitê com foco em desempenho, SHAP global e simulação de perfis.")
 
 cursos = lista_cursos()
 if not cursos:
@@ -506,7 +544,7 @@ if not cursos:
     st.stop()
 
 with st.sidebar:
-    st.header("🔎 Seleção")
+    st.header("Seleção")
     curso_sel = st.selectbox("Curso", options=cursos, index=0, format_func=humaniza_slug)
 
 if curso_sel is None:
@@ -559,133 +597,83 @@ metricas_comite = metricas_rep[metricas_rep["modelo"] == COMMITTEE_NAME].copy().
 top_df, importancias_abs, total_imp = calcular_top_shap(shap_values, X_shap, top_n=10)
 riscos, permanencias = gerar_listas_risco_permanencia(shap_values, X_shap, top_df["feature"].tolist())
 
+mostrar = agregado_comite.copy()
+cols_keep = [
+    "modelo",
+    "n",
+    "f1_pos_media",
+    "f1_pos_dp",
+    "f1_weighted_media",
+    "acuracia_media",
+    "roc_auc_media",
+    "avg_precision_media",
+    "brier_cal_media",
+    "threshold_media",
+]
+cols_keep = [c for c in cols_keep if c in mostrar.columns]
+
 total_instancias = None
 if not metricas_comite.empty and {"tr_n", "te_n"}.issubset(metricas_comite.columns):
     total_instancias = int(metricas_comite.iloc[0]["tr_n"] + metricas_comite.iloc[0]["te_n"])
 
-st.subheader(f"Curso: {humaniza_slug(curso_sel)}  •  Janela: p{periodo_sel}")
+abas = st.tabs([
+    "📌 Resumo",
+    "🧠 Explicabilidade",
+    "🧪 Simulação",
+    "⚙️ Detalhes técnicos",
+])
 
-abas = st.tabs(
-    [
-        "🧠 SHAP global",
-        "📌 Visão geral",
-        "📈 Robustez das repetições",
-        "🖼️ Melhor execução",
-        "🧪 Simular estudante",
-        "🤖 Explicação assistida",
-    ]
-)
 
 # ============================================================
-# Aba 1 - SHAP global
+# Aba 1 - resumo
 # ============================================================
 with abas[0]:
-    st.markdown("### Explicabilidade global do período")
-    st.caption(
-        "O gráfico SHAP resume quais variáveis mais influenciaram o comitê nesta janela. "
-        "Contribuições positivas se associam ao aumento do risco de evasão, enquanto contribuições negativas se associam à permanência."
-    )
+    st.subheader(f"{humaniza_slug(curso_sel)} • p{periodo_sel}")
 
-    col_left, col_right = st.columns([1.45, 0.95], gap="large")
+    c1, c2, c3, c4 = st.columns(4)
 
-    with col_left:
-        st.markdown("#### Top 10 variáveis por peso global")
-        plot_df = top_df.sort_values("importancia")
+    if not agregado_comite.empty:
+        row = agregado_comite.iloc[0]
+        c1.metric("F1 risco", f"{row.get('f1_pos_media', np.nan):.3f}")
+        c2.metric("ROC-AUC", f"{row.get('roc_auc_media', np.nan):.3f}")
+        c3.metric("Brier", f"{row.get('brier_cal_media', np.nan):.3f}")
+    else:
+        c1.metric("F1 risco", "-")
+        c2.metric("ROC-AUC", "-")
+        c3.metric("Brier", "-")
 
-        fig_bar, ax_bar = plt.subplots(figsize=(8, 5.0))
-        ax_bar.barh(plot_df["feature_label"], plot_df["importancia"])
-        ax_bar.set_xlabel("Média do |SHAP|")
-        ax_bar.set_ylabel("Variável")
-        ax_bar.set_title("Importância global do comitê")
-        st.pyplot(fig_bar)
-        plt.close(fig_bar)
+    c4.metric("Nº estudantes", f"{total_instancias}" if total_instancias is not None else "-")
 
-        st.markdown("#### Summary plot")
-        st.caption("Cada ponto representa uma instância analisada. A posição horizontal indica o impacto da variável na decisão do comitê.")
+    st.markdown("#### Variáveis mais importantes")
+    plot_df = top_df.sort_values("importancia")
 
-        shap.summary_plot(
-            shap_values,
-            X_shap,
-            show=False,
-            max_display=10,
-            plot_size=(8, 5),
-        )
-        st.pyplot(plt.gcf())
-        plt.close(plt.gcf())
+    fig_bar, ax_bar = plt.subplots(figsize=(8, 4.2))
+    ax_bar.barh(plot_df["feature_label"], plot_df["importancia"])
+    ax_bar.set_xlabel("Média do |SHAP|")
+    ax_bar.set_ylabel("")
+    ax_bar.set_title("Top 10 variáveis")
+    st.pyplot(fig_bar)
+    plt.close(fig_bar)
 
-    with col_right:
-        st.markdown("#### Leitura rápida")
+    col1, col2 = st.columns(2)
 
-        c1, c2 = st.columns(2)
-        c1.metric("Estudantes analisados", f"{total_instancias}" if total_instancias is not None else "-")
-
-        if not agregado_comite.empty:
-            row = agregado_comite.iloc[0]
-            c2.metric("F1 dos casos de risco", f"{row.get('f1_pos_media', np.nan):.3f}")
-        else:
-            c2.metric("F1 dos casos de risco", "-")
-
-        c3, c4 = st.columns(2)
-        if not agregado_comite.empty:
-            row = agregado_comite.iloc[0]
-            c3.metric("ROC-AUC", f"{row.get('roc_auc_media', np.nan):.3f}")
-            c4.metric("Qualidade das probabilidades", f"{row.get('brier_cal_media', np.nan):.3f}")
-        else:
-            c3.metric("ROC-AUC", "-")
-            c4.metric("Qualidade das probabilidades", "-")
-
-        if not ic95_comite.empty:
-            ic = ic95_comite.iloc[0]
-            st.caption(f"IC95 do F1_pos: [{ic['f1_pos_ci95_low']:.3f}, {ic['f1_pos_ci95_high']:.3f}]")
-
-        st.markdown("---")
-        st.markdown("#### Sinais associados ao risco")
+    with col1:
+        st.markdown("**Sinais de risco**")
         if riscos:
-            for item in riscos[:8]:
+            for item in riscos[:5]:
                 st.markdown(f"- {item}")
         else:
-            st.info("Nenhum sinal de risco destacado com o critério atual.")
+            st.info("Nenhum sinal destacado.")
 
-        st.markdown("#### Sinais associados à permanência")
+    with col2:
+        st.markdown("**Sinais de permanência**")
         if permanencias:
-            for item in permanencias[:8]:
+            for item in permanencias[:5]:
                 st.markdown(f"- {item}")
         else:
-            st.info("Nenhum sinal de permanência destacado com o critério atual.")
+            st.info("Nenhum sinal destacado.")
 
-        if "nota_ingresso" in [f.lower() for f in top_df["feature"].tolist()]:
-            st.markdown("#### Observação sobre a nota de ingresso")
-            st.caption("A nota de ingresso pode apresentar distribuição não homogênea no summary plot. Por isso, sua interpretação deve ser feita com cautela e sempre em conjunto com as demais variáveis do período.")
-
-
-# ============================================================
-# Aba 2 - visão geral
-# ============================================================
-with abas[1]:
-    esq, dir_ = st.columns([1.3, 1])
-
-    with esq:
-        st.markdown("### Desempenho agregado do comitê")
-        mostrar = agregado_comite.copy()
-        if not mostrar.empty:
-            cols_keep = [
-                "modelo",
-                "n",
-                "f1_pos_media",
-                "f1_pos_dp",
-                "f1_weighted_media",
-                "acuracia_media",
-                "roc_auc_media",
-                "avg_precision_media",
-                "brier_cal_media",
-                "threshold_media",
-            ]
-            cols_keep = [c for c in cols_keep if c in mostrar.columns]
-            st.dataframe(mostrar[cols_keep], use_container_width=True)
-        else:
-            st.info("Tabela agregada do comitê não encontrada.")
-
-        st.markdown("### Ranking global de importância")
+    with st.expander("Ver ranking completo"):
         st.dataframe(
             ranking_df.head(15)[["feature_label", "importancia_media"]].rename(
                 columns={"feature_label": "Variável", "importancia_media": "Importância média"}
@@ -694,103 +682,58 @@ with abas[1]:
             hide_index=True,
         )
 
-    with dir_:
-        st.markdown("### Melhor execução do comitê")
-        if meta_comite:
-            st.write(f"**Repetição:** {meta_comite.get('melhor_repeticao', '-')}")
-            st.write(f"**Threshold:** {meta_comite.get('threshold', np.nan):.3f}")
-            st.write(f"**F1_pos:** {meta_comite.get('f1_pos', np.nan):.3f}")
-            st.write(f"**ROC-AUC:** {meta_comite.get('roc_auc', np.nan):.3f}")
-            st.write(f"**Average Precision:** {meta_comite.get('avg_precision', np.nan):.3f}")
-            st.write(f"**Brier calibrado:** {meta_comite.get('brier_cal', np.nan):.3f}")
-            if "pesos" in meta_comite:
-                pesos = meta_comite["pesos"]
-                st.write(f"**Pesos do comitê:** XGB={pesos[0]:.3f} • LGBM={pesos[1]:.3f} • CAT={pesos[2]:.3f}")
-        else:
-            st.info("Metadados da melhor execução não encontrados.")
+    st.markdown("#### Explicação assistida")
+    st.caption("Gera uma leitura em linguagem natural com base nos principais sinais do período.")
 
-        st.markdown("### Como interpretar")
+    if st.button("Gerar explicação em linguagem natural", key="btn_openai_resumo"):
+        prompt = gerar_prompt_explicacao(curso_sel, periodo_sel, riscos, permanencias, top_df)
+        resposta = gerar_explicacao_openai(prompt)
+        st.markdown(resposta)
+
+    with st.expander("Mostrar prompt usado"):
+        st.code(gerar_prompt_explicacao(curso_sel, periodo_sel, riscos, permanencias, top_df), language="text")
+
+
+# ============================================================
+# Aba 2 - explicabilidade
+# ============================================================
+with abas[1]:
+    st.subheader("Explicabilidade global")
+    st.caption(
+        "Contribuições positivas se associam ao aumento do risco de evasão; contribuições negativas se associam à permanência."
+    )
+
+    shap.summary_plot(
+        shap_values,
+        X_shap,
+        show=False,
+        max_display=10,
+        plot_size=(8, 4.8),
+    )
+    st.pyplot(plt.gcf())
+    plt.close(plt.gcf())
+
+    if "nota_ingresso" in [f.lower() for f in top_df["feature"].tolist()]:
+        st.info(
+            "A nota de ingresso pode apresentar distribuição não homogênea no summary plot. Por isso, sua leitura deve ser feita com cautela e sempre em conjunto com as demais variáveis."
+        )
+
+    with st.expander("Observações de leitura"):
         st.markdown(
             """
-- **F1 da classe positiva** resume o desempenho na identificação dos estudantes em risco.
-- **ROC-AUC** e **Average Precision** indicam a qualidade da separação entre as classes.
-- **Brier calibrado** mostra a qualidade probabilística após calibração.
-- **SHAP global** representa o peso e a direção dos fatores no período analisado.
+- O gráfico resume as variáveis que mais influenciaram o comitê.
+- A direção do efeito deve ser interpretada com cautela.
+- Os sinais indicam associação, não causalidade.
             """
         )
 
 
 # ============================================================
-# Aba 3 - robustez
+# Aba 3 - simulador
 # ============================================================
 with abas[2]:
-    st.markdown("### Séries por repetição do comitê")
-
-    metrica_plot = st.selectbox(
-        "Métrica",
-        ["f1_pos", "roc_auc", "avg_precision", "brier_cal", "threshold"],
-        format_func=lambda x: {
-            "f1_pos": "F1 classe positiva",
-            "roc_auc": "ROC-AUC",
-            "avg_precision": "Average Precision",
-            "brier_cal": "Brier calibrado",
-            "threshold": "Threshold",
-        }[x],
-    )
-
-    fig, ax = plt.subplots(figsize=(8, 4.5))
-    ax.plot(metricas_comite["repeticao"], metricas_comite[metrica_plot], marker="o")
-    ax.set_xlabel("Repetição")
-    ax.set_ylabel(metrica_plot)
-    ax.set_title(f"{metrica_plot} ao longo das repetições")
-    st.pyplot(fig)
-    plt.close(fig)
-
-    st.markdown("### Logs por repetição")
-    cols_rep = [
-        "repeticao",
-        "f1_pos",
-        "f1_pos_val",
-        "roc_auc",
-        "avg_precision",
-        "brier_cal",
-        "threshold",
-        "w_xgb",
-        "w_lgbm",
-        "w_cat",
-    ]
-    cols_rep = [c for c in cols_rep if c in metricas_comite.columns]
-    st.dataframe(metricas_comite[cols_rep], use_container_width=True)
-
-
-# ============================================================
-# Aba 4 - melhor execução
-# ============================================================
-with abas[3]:
-    st.markdown("### Figuras da melhor execução do comitê")
-
-    c1, c2 = st.columns(2)
-    c3, c4 = st.columns(2)
-
-    if figuras_best["confusao"]:
-        c1.image(str(figuras_best["confusao"]), caption="Matriz de confusão")
-    if figuras_best["roc"]:
-        c2.image(str(figuras_best["roc"]), caption="Curva ROC")
-    if figuras_best["pr"]:
-        c3.image(str(figuras_best["pr"]), caption="Curva Precision-Recall")
-    if figuras_best["calibracao"]:
-        c4.image(str(figuras_best["calibracao"]), caption="Curva de calibração")
-
-    if not any(figuras_best.values()):
-        st.info("As figuras da melhor execução não foram localizadas.")
-
-
-# ============================================================
-# Aba 5 - simulador
-# ============================================================
-with abas[4]:
-    st.markdown("### Simular um novo perfil")
-    st.caption("A previsão usa exatamente o mesmo comitê calibrado salvo em `comite_model.pkl`, composto por XGBoost, LightGBM e CatBoost.")
+    st.subheader("Simular um novo perfil")
+    st.caption("A previsão usa o mesmo comitê calibrado salvo em `comite_model.pkl`.")
 
     cols_pred = list(getattr(modelo_comite, "feature_names_", X_shap.columns.tolist()))
     cols_pred_lower = {c.lower(): c for c in cols_pred}
@@ -856,56 +799,50 @@ with abas[4]:
         cota_pcd = cc5.checkbox("PCD", disabled=not tem_coluna("cota_pcd"))
 
         st.markdown("#### Etnia")
-        op_etnia = []
-        if tem_coluna("etnia_branca"):
-            op_etnia.append("Branca")
-        if tem_coluna("etnia_preta"):
-            op_etnia.append("Preta")
-        if tem_coluna("etnia_parda"):
-            op_etnia.append("Parda")
-        if tem_coluna("etnia_outra"):
-            op_etnia.append("Outra")
-        etnia = st.radio("Selecione uma etnia", op_etnia or ["Branca"], horizontal=True)
+        op_etnia = ["Branca", "Preta", "Parda", "Outra"]
+        etnia = st.radio("Selecione uma etnia", op_etnia, horizontal=True)
+        st.caption("Todas as opções são exibidas na interface. Se alguma categoria não fizer parte do modelo deste curso/período, ela simplesmente não será usada no cálculo.")
 
         st.markdown(f"#### Dados por período (até o {periodo_max}º)")
         per_vals = {}
 
-        for p in [pp for pp in periodos_detectados if pp <= periodo_max]:
-            st.markdown(f"**Período {p}**")
-            a, b, c = st.columns(3)
+        periodos_validos = [pp for pp in periodos_detectados if pp <= periodo_max]
+        primeiro_periodo = periodos_validos[0] if periodos_validos else None
 
-            nomes = {
-                "ap": nome_coluna(f"periodo_{p}_disciplinas_aprovadas"),
-                "rep": nome_coluna(f"periodo_{p}_disciplinas_reprovadas"),
-                "ri": nome_coluna(f"periodo_{p}_disciplinas_ri"),
-                "tr": nome_coluna(f"periodo_{p}_disciplinas_trancadas"),
-                "out": nome_coluna(f"periodo_{p}_disciplinas_outros_status"),
-                "br": nome_coluna(f"periodo_{p}_bolsa_remunerada"),
-                "bnr": nome_coluna(f"periodo_{p}_bolsa_n_remunerada"),
-                "ae": nome_coluna(f"periodo_{p}_ae"),
-            }
+        for p in periodos_validos:
+            with st.expander(f"{p}º período", expanded=(p == primeiro_periodo)):
+                a, b = st.columns(2)
 
-            per_vals[nomes["ap"]] = a.number_input(
-                "Aprovadas", min_value=0, step=1, value=valor_mediano(nomes["ap"]), key=f"ap_{p}"
-            )
-            per_vals[nomes["rep"]] = a.number_input(
-                "Reprovadas", min_value=0, step=1, value=valor_mediano(nomes["rep"]), key=f"rep_{p}"
-            )
-            per_vals[nomes["ri"]] = b.number_input(
-                "RI", min_value=0, step=1, value=valor_mediano(nomes["ri"]), key=f"ri_{p}"
-            )
-            per_vals[nomes["tr"]] = b.number_input(
-                "Trancadas", min_value=0, step=1, value=valor_mediano(nomes["tr"]), key=f"tr_{p}"
-            )
-            per_vals[nomes["out"]] = c.number_input(
-                "Outros status", min_value=0, step=1, value=valor_mediano(nomes["out"]), key=f"out_{p}"
-            )
+                nomes = {
+                    "ap": nome_coluna(f"periodo_{p}_disciplinas_aprovadas"),
+                    "rep": nome_coluna(f"periodo_{p}_disciplinas_reprovadas"),
+                    "ri": nome_coluna(f"periodo_{p}_disciplinas_ri"),
+                    "tr": nome_coluna(f"periodo_{p}_disciplinas_trancadas"),
+                    "out": nome_coluna(f"periodo_{p}_disciplinas_outros_status"),
+                    "br": nome_coluna(f"periodo_{p}_bolsa_remunerada"),
+                    "bnr": nome_coluna(f"periodo_{p}_bolsa_n_remunerada"),
+                    "ae": nome_coluna(f"periodo_{p}_ae"),
+                }
 
-            per_vals[nomes["br"]] = c.selectbox("Bolsa remunerada", ["Não", "Sim"], key=f"br_{p}")
-            per_vals[nomes["bnr"]] = b.selectbox("Bolsa não remunerada", ["Não", "Sim"], key=f"bnr_{p}")
-            per_vals[nomes["ae"]] = a.selectbox("Assistência estudantil", ["Não", "Sim"], key=f"ae_{p}")
+                per_vals[nomes["ap"]] = a.number_input(
+                    "Aprovadas", min_value=0, step=1, value=valor_mediano(nomes["ap"]), key=f"ap_{p}"
+                )
+                per_vals[nomes["rep"]] = a.number_input(
+                    "Reprovadas", min_value=0, step=1, value=valor_mediano(nomes["rep"]), key=f"rep_{p}"
+                )
+                per_vals[nomes["ri"]] = a.number_input(
+                    "RI", min_value=0, step=1, value=valor_mediano(nomes["ri"]), key=f"ri_{p}"
+                )
+                per_vals[nomes["tr"]] = a.number_input(
+                    "Trancadas", min_value=0, step=1, value=valor_mediano(nomes["tr"]), key=f"tr_{p}"
+                )
 
-            st.divider()
+                per_vals[nomes["out"]] = b.number_input(
+                    "Outros status", min_value=0, step=1, value=valor_mediano(nomes["out"]), key=f"out_{p}"
+                )
+                per_vals[nomes["br"]] = b.selectbox("Bolsa remunerada", ["Não", "Sim"], key=f"br_{p}")
+                per_vals[nomes["bnr"]] = b.selectbox("Bolsa não remunerada", ["Não", "Sim"], key=f"bnr_{p}")
+                per_vals[nomes["ae"]] = b.selectbox("Assistência estudantil", ["Não", "Sim"], key=f"ae_{p}")
 
         submitted = st.form_submit_button("Calcular risco")
 
@@ -964,12 +901,11 @@ with abas[4]:
         yhat = int(proba >= modelo_comite.threshold_)
 
         m1, m2, m3 = st.columns(3)
-        m1.metric("Risco estimado de evasão", f"{proba*100:.1f}%")
+        m1.metric("Risco estimado de evasão", f"{proba * 100:.1f}%")
         m2.metric("Classe prevista", "Evasão" if yhat == 1 else "Permanência")
         m3.metric("Threshold do comitê", f"{modelo_comite.threshold_:.3f}")
 
-        st.markdown("### Explicação da previsão")
-        st.caption("O gráfico abaixo mostra como cada variável empurrou a decisão do comitê para evasão ou permanência.")
+        st.markdown("#### Explicação da previsão")
 
         try:
             X_bg_local = X_shap[cols_pred].copy()
@@ -980,26 +916,92 @@ with abas[4]:
             st.pyplot(fig_w)
             plt.close(fig_w)
 
-            st.markdown("#### Principais fatores desta previsão")
-            top_locais = impactos.head(6)
-            for row in top_locais.itertuples():
-                direcao = "aumentou o risco de evasão" if row.shap > 0 else "reduziu o risco de evasão"
-                st.markdown(f"- **{row.feature_label}** (valor = {row.valor}): {direcao}.")
+            with st.expander("Principais fatores desta previsão", expanded=True):
+                top_locais = impactos.head(6)
+                for row in top_locais.itertuples():
+                    direcao = "aumentou o risco de evasão" if row.shap > 0 else "reduziu o risco de evasão"
+                    st.markdown(f"- **{row.feature_label}** (valor = {row.valor}): {direcao}.")
         except Exception as e:
             st.warning(f"Não foi possível gerar a explicação SHAP local: {e}")
 
 
 # ============================================================
-# Aba 6 - OpenAI / ChatGPT
+# Aba 4 - detalhes técnicos
 # ============================================================
-with abas[5]:
-    st.markdown("### Explicação assistida pela OpenAI")
-    st.caption("Esta aba usa a API da OpenAI. Defina OPENAI_API_KEY e, se quiser, OPENAI_MODEL.")
+with abas[3]:
+    st.subheader("Detalhes técnicos")
 
-    if st.button("Gerar explicação em linguagem natural"):
-        prompt = gerar_prompt_explicacao(curso_sel, periodo_sel, riscos, permanencias, top_df)
-        resposta = gerar_explicacao_openai(prompt)
-        st.markdown(resposta)
+    with st.expander("Desempenho agregado"):
+        if not mostrar.empty:
+            st.dataframe(mostrar[cols_keep], use_container_width=True)
+        else:
+            st.info("Tabela agregada do comitê não encontrada.")
 
-    with st.expander("Mostrar prompt usado"):
-        st.code(gerar_prompt_explicacao(curso_sel, periodo_sel, riscos, permanencias, top_df), language="text")
+    with st.expander("Melhor execução"):
+        if meta_comite:
+            st.write(f"**Repetição:** {meta_comite.get('melhor_repeticao', '-')}")
+            st.write(f"**Threshold:** {meta_comite.get('threshold', np.nan):.3f}")
+            st.write(f"**F1_pos:** {meta_comite.get('f1_pos', np.nan):.3f}")
+            st.write(f"**ROC-AUC:** {meta_comite.get('roc_auc', np.nan):.3f}")
+            st.write(f"**Average Precision:** {meta_comite.get('avg_precision', np.nan):.3f}")
+            st.write(f"**Brier calibrado:** {meta_comite.get('brier_cal', np.nan):.3f}")
+            if "pesos" in meta_comite:
+                pesos = meta_comite["pesos"]
+                st.write(f"**Pesos do comitê:** XGB={pesos[0]:.3f} • LGBM={pesos[1]:.3f} • CAT={pesos[2]:.3f}")
+        else:
+            st.info("Metadados da melhor execução não encontrados.")
+
+    with st.expander("Figuras da melhor execução"):
+        opcoes_fig = {
+            "Matriz de confusão": figuras_best["confusao"],
+            "Curva ROC": figuras_best["roc"],
+            "Curva Precision-Recall": figuras_best["pr"],
+            "Curva de calibração": figuras_best["calibracao"],
+        }
+        opcoes_validas = {k: v for k, v in opcoes_fig.items() if v is not None}
+
+        if opcoes_validas:
+            fig_sel = st.selectbox("Figura", list(opcoes_validas.keys()))
+            st.image(str(opcoes_validas[fig_sel]), caption=fig_sel)
+        else:
+            st.info("As figuras da melhor execução não foram localizadas.")
+
+    with st.expander("Robustez das repetições"):
+        if metricas_comite.empty:
+            st.info("Não há métricas por repetição disponíveis para o comitê.")
+        else:
+            metrica_plot = st.selectbox(
+                "Métrica",
+                ["f1_pos", "roc_auc", "avg_precision", "brier_cal", "threshold"],
+                format_func=lambda x: {
+                    "f1_pos": "F1 classe positiva",
+                    "roc_auc": "ROC-AUC",
+                    "avg_precision": "Average Precision",
+                    "brier_cal": "Brier calibrado",
+                    "threshold": "Threshold",
+                }[x],
+                key="metrica_tecnica",
+            )
+
+            fig, ax = plt.subplots(figsize=(8, 4))
+            ax.plot(metricas_comite["repeticao"], metricas_comite[metrica_plot], marker="o")
+            ax.set_xlabel("Repetição")
+            ax.set_ylabel(metrica_plot)
+            ax.set_title(f"{metrica_plot} ao longo das repetições")
+            st.pyplot(fig)
+            plt.close(fig)
+
+            cols_rep = [
+                "repeticao",
+                "f1_pos",
+                "f1_pos_val",
+                "roc_auc",
+                "avg_precision",
+                "brier_cal",
+                "threshold",
+                "w_xgb",
+                "w_lgbm",
+                "w_cat",
+            ]
+            cols_rep = [c for c in cols_rep if c in metricas_comite.columns]
+            st.dataframe(metricas_comite[cols_rep], use_container_width=True)
