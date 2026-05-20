@@ -632,7 +632,11 @@ with abas[0]:
 
     c1, c2, c3, c4 = st.columns(4)
 
-    if not agregado_comite.empty:
+    if meta_comite:
+        c1.metric("F1 risco", f"{meta_comite.get('f1_pos', np.nan):.3f}")
+        c2.metric("ROC-AUC", f"{meta_comite.get('roc_auc', np.nan):.3f}")
+        c3.metric("Brier", f"{meta_comite.get('brier_cal', np.nan):.3f}")
+    elif not agregado_comite.empty:
         row = agregado_comite.iloc[0]
         c1.metric("F1 risco", f"{row.get('f1_pos_media', np.nan):.3f}")
         c2.metric("ROC-AUC", f"{row.get('roc_auc_media', np.nan):.3f}")
@@ -641,6 +645,7 @@ with abas[0]:
         c1.metric("F1 risco", "-")
         c2.metric("ROC-AUC", "-")
         c3.metric("Brier", "-")
+        c4.metric("Nº estudantes", f"{total_instancias}" if total_instancias is not None else "-")
 
     c4.metric("Estudantes analisados", f"{total_instancias}" if total_instancias is not None else "-")
 
